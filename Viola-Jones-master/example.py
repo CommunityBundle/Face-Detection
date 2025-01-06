@@ -3,8 +3,28 @@ import violajones.AdaBoost as ab
 import violajones.Utils as utils
 import pickle
 import progressbar
+import matplotlib.pyplot as plt
 from multiprocessing import Pool
+def plot_metrics(precision, recall, f1_score, accuracy):
+    metrics = ['Precision', 'Recall', 'F1-Score', 'Accuracy']
+    values = [precision, recall, f1_score, accuracy]
 
+    # Plotting the metrics
+    plt.figure(figsize=(10, 6))
+    bars = plt.bar(metrics, values, color=['skyblue', 'lightgreen', 'salmon', 'orange'])
+    plt.ylim(0, 1)  # Metrics are between 0 and 1
+    plt.title('Evaluation Metrics', fontsize=16)
+    plt.ylabel('Value', fontsize=14)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+
+    # Adding text on top of bars
+    for bar, value in zip(bars, values):
+        plt.text(bar.get_x() + bar.get_width() / 2.0, bar.get_height(), f'{value:.2f}', 
+                 ha='center', va='bottom', fontsize=12)
+
+    # Display the graph
+    plt.show()
 def main():
     pos_training_path = 'face.train/train/face'
     neg_training_path = 'face.train/train/non-face'
@@ -53,11 +73,32 @@ def main():
           + '  (' + str((float(correct_faces) / len(faces_testing)) * 100) + '%)\n  non-Faces: '
           + str(correct_non_faces) + '/' + str(len(non_faces_testing)) + '  (' 
           + str((float(correct_non_faces) / len(non_faces_testing)) * 100) + '%)')
+    print('Testing selected classifiers..')
+    # Predictions for faces and non-faces
+    face_predictions = utils.ensemble_vote_all(faces_ii_testing, classifiers)
+    non_face_predictions = utils.ensemble_vote_all(non_faces_ii_testing, classifiers)
 
-    # Just for fun: putting all haar-like features over each other generates a face-like image
-    recon = utils.reconstruct(classifiers, faces_testing[0].shape)
-    recon.save('reconstruction.png')
+    # Calculate metrics
+    TP = sum(face_predictions)  # Correctly classified faces
+    FN = len(faces_testing) - TP  # Missed faces
+    TN = len(non_faces_testing) - sum(non_face_predictions)  # Correctly classified non-faces
+    FP = sum(non_face_predictions)  # Non-faces classified as faces
 
+    precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+    recall = TP / (TP + FN) if (TP + FN) > 0 else 0
+    f1_score = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    accuracy = (TP + TN) / (len(faces_testing) + len(non_faces_testing))
+
+    # Print results
+    print('..done.\n\nResults:')
+    print(f'      Faces: {TP}/{len(faces_testing)}  ({(TP / len(faces_testing)) * 100:.2f}%)')
+    print(f'  Non-Faces: {TN}/{len(non_faces_testing)}  ({(TN / len(non_faces_testing)) * 100:.2f}%)')
+    print(f'\nEvaluation Metrics:')
+    print(f'  Precision: {precision:.4f}')
+    print(f'  Recall: {recall:.4f}')
+    print(f'  F1-Score: {f1_score:.4f}')
+    print(f'  Accuracy: {accuracy:.4f}')
+    plot_metrics(precision, recall, f1_score, accuracy)
 
 if __name__ == "__main__":
     main()
